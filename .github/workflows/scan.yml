@@ -27,11 +27,15 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add state/top10.json
-          if git diff --staged --quiet; then
-            echo "لا تغيير في الحالة."
+          if [ -f state/top10.json ]; then
+            git add state/top10.json
+            if git diff --staged --quiet; then
+              echo "لا تغيير في الحالة."
+            else
+              git commit -m "update state [skip ci]"
+              git pull --rebase --autostash origin main
+              git push
+            fi
           else
-            git commit -m "update state [skip ci]"
-            git pull --rebase --autostash origin main
-            git push
+            echo "لا ملف حالة (السوق مغلق أو لا بيانات) — تخطّي."
           fi
