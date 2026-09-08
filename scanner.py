@@ -107,9 +107,9 @@ def scan(side, title, state):
     send_telegram("\n".join(lines))
 
 if __name__ == "__main__":
-    # if not market_is_open():
-    #     print("market closed - skipping")
-    #     raise SystemExit(0)
+    if not market_is_open():
+        print("market closed - skipping")
+        raise SystemExit(0)
     state = load_state()
     ts = et_stamp()
     scan("calls", f"CALL momentum - {ts}", state)
