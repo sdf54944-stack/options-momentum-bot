@@ -76,13 +76,13 @@ def send_telegram(text):
     return r.ok
 
 def build_table(top, new_ids):
-    header = f"{'#':<3}{'':<2}{'SYMBOL':<7}{'STRIKE':>7}  {'VOL':>8}{'OI':>7}{'V/OI':>8}{'IV':>5}"
+    header = f"{'#':<3}{'':<3}{'SYMBOL':<7}{'STRIKE':>7}  {'VOL':>8}{'OI':>7}{'V/OI':>8}{'IV':>5}"
     sep = "-" * len(header)
     lines = [header, sep]
     for i, r in enumerate(top.itertuples(), 1):
-        tag = "🆕" if r.contractSymbol in new_ids else "  "
+        tag = "NEW" if r.contractSymbol in new_ids else "   "
         lines.append(
-            f"{i:<3}{tag:<2}{r.ticker:<7}{r.strike:>7g}  "
+            f"{i:<3}{tag:<3}{r.ticker:<7}{r.strike:>7g}  "
             f"{int(r.volume):>8}{int(r.openInterest):>7}"
             f"{r.vol_oi:>8.1f}{r.impliedVolatility*100:>4.0f}%"
         )
