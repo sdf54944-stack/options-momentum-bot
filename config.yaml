@@ -1,0 +1,44 @@
+# ===== الرموز =====
+universe:
+  - AAPL
+  - TSLA
+  - NVDA
+  - AMD
+  - META
+  - MSFT
+  - AMZN
+  - GOOGL
+  - SPY
+  - QQQ
+  - NFLX
+  - COIN
+  - PLTR
+  - SMCI
+  - MARA
+  - AVGO
+
+# ===== الفلاتر =====
+filters:
+  top_n: 10
+  min_volume: 100
+  min_open_interest: 250
+  max_expiries: 4
+
+# ===== الترتيب =====
+# ranking: "vol_oi" (زخم خالص) | "volume" | "composite"
+ranking: "vol_oi"
+composite_weights:      # يُستخدم فقط إذا ranking = composite
+  vol_oi: 0.6
+  volume: 0.4
+
+# ===== ساعات السوق (ET) =====
+market:
+  open: "09:30"
+  close: "16:00"
+
+# ===== التحصين =====
+health:
+  # يُنبّه إذا نسبة الرموز التي رجعت "لا بيانات" تجاوزت هذا (0.0–1.0)
+  no_data_alert_ratio: 0.5
+  # رسالة نبض يومية تؤكد أن البوت حيّ (ضمن أول تشغيل بعد هذا الوقت ET)
+  heartbeat_after: "09:35"
