@@ -75,11 +75,18 @@ def send_telegram(text):
         print("telegram error:", r.text)
     return r.ok
 
-def row_line(i, r, is_new):
-    tag = "NEW " if is_new else ""
-    return (f"{i}. {tag}<b>{r.ticker}</b> {r.strike:g} {r.expiry} | "
-            f"Vol {int(r.volume)} / OI {int(r.openInterest)} "
-            f"(V/OI {r.vol_oi:.1f}) | IV {r.impliedVolatility*100:.0f}%")
+def build_table(top, new_ids):
+    header = f"{'#':<3}{'':<2}{'SYMBOL':<7}{'STRIKE':>7}  {'VOL':>8}{'OI':>7}{'V/OI':>8}{'IV':>5}"
+    sep = "-" * len(header)
+    lines = [header, sep]
+    for i, r in enumerate(top.itertuples(), 1):
+        tag = "🆕" if r.contractSymbol in new_ids else "  "
+        lines.append(
+            f"{i:<3}{tag:<2}{r.ticker:<7}{r.strike:>7g}  "
+            f"{int(r.volume):>8}{int(r.openInterest):>7}"
+            f"{r.vol_oi:>8.1f}{r.impliedVolatility*100:>4.0f}%"
+        )
+    return "\n".join(lines)
 
 def scan(side, title, state):
     frames = [f for f in (fetch_contracts(tk, side) for tk in UNIVERSE) if not f.empty]
@@ -90,21 +97,24 @@ def scan(side, title, state):
         print(f"{side}: no qualified contracts"); return
     top = scored.sort_values("score", ascending=False).head(TOP_N)
 
+    # التاريخ موحّد؟ اعرضه في العنوان مرة واحدة
+    exp_dates = top["expiry"].unique()
+    date_note = f" | Exp {exp_dates[0]}" if len(exp_dates) == 1 else ""
+
     current_ids = top["contractSymbol"].tolist()
     prev_ids = set(state.get(side, []))
     state[side] = current_ids
-
     if not prev_ids:
         print(f"{side}: first run - seeding state, no alert"); return
-
     new_ids = [cid for cid in current_ids if cid not in prev_ids]
     if not new_ids:
         print(f"{side}: no new entries"); return
 
-    lines = [f"<b>{title}</b>", f"New in Top 10: {len(new_ids)}\n"]
-    for i, r in enumerate(top.itertuples(), 1):
-        lines.append(row_line(i, r, r.contractSymbol in new_ids))
-    send_telegram("\n".join(lines))
+    table = build_table(top, new_ids)
+    msg = (f"<b>{title}{date_note}</b>\n"
+           f"New in Top 10: {len(new_ids)}\n"
+           f"<pre>{table}</pre>")
+    send_telegram(msg)
 
 if __name__ == "__main__":
     if not market_is_open():
