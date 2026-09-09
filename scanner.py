@@ -10,7 +10,7 @@ TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
 TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 TOP_N = 10
 MIN_VOLUME = 100
-MIN_OI = 50
+MIN_OI = 250
 MAX_EXPIRIES = 4
 STATE_FILE = "state/top10.json"
 
@@ -64,7 +64,7 @@ def rank_momentum(df):
     if df.empty:
         return df
     df["vol_oi"] = df["volume"] / df["openInterest"].replace(0, np.nan)
-    df["score"] = df["vol_oi"].rank(pct=True) * 0.6 + df["volume"].rank(pct=True) * 0.4
+    df["score"] = df["vol_oi"]
     return df
 
 def send_telegram(text):
