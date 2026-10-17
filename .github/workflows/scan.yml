@@ -1,7 +1,7 @@
 name: options-momentum-scan
 on:
   schedule:
-    - cron: "0,30 13-21 * * 1-5"
+    - cron: "7,37 12-22 * * 1-5"
   workflow_dispatch:
 permissions:
   contents: write
