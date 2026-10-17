@@ -155,12 +155,10 @@ def fetch_news(ticker, since_dt):
     try:
         feed = feedparser.parse(url)
     except Exception as e:
-        print(f"[DIAG] {ticker}: RSS ERROR {e}")
+        print(f"news RSS error {ticker}: {e}")
         return []
-    entries = feed.entries or []
-    print(f"[DIAG] {ticker}: {len(entries)} RSS entries")
     out = []
-    for e in entries:
+    for e in feed.entries or []:
         title = getattr(e, "title", None)
         if not title:
             continue
@@ -172,9 +170,8 @@ def fetch_news(ticker, since_dt):
                 ts = None
         if ts is not None and ts < since_dt:
             continue
-        link = getattr(e, "link", "")
-        out.append({"title": title, "pub": "Yahoo Finance", "link": link})
-    print(f"[DIAG] {ticker}: parsed {len(out)} after filter")
+        out.append({"title": title, "pub": "Yahoo Finance",
+                    "link": getattr(e, "link", "")})
     return out
 
 def phase_premarket(state, force=False):
