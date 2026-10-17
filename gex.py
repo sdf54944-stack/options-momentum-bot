@@ -97,18 +97,22 @@ def compute_gex(ticker):
     call_wall = by_strike.idxmax()
     put_wall = by_strike.idxmin()
 
-    # Gamma Flip: أقرب تقاطع للسعر ضمن ±NEAR_PCT
+    # Gamma Flip: التقاطع الأقرب للسعر بين كل تقاطعات GEX التراكمي
     lo, hi = spot * (1 - NEAR_PCT), spot * (1 + NEAR_PCT)
     near = by_strike[(by_strike.index >= lo) & (by_strike.index <= hi)]
     flip = None
     if not near.empty:
         cum = near.cumsum()
         keys = list(cum.index)
+        crossings = []
         for j in range(1, len(keys)):
             if (cum[keys[j - 1]] < 0) != (cum[keys[j]] < 0):
-                flip = keys[j] if abs(keys[j] - spot) < abs(keys[j - 1] - spot) else keys[j - 1]
-                break
-        if flip is None:
+                # النقطة الأقرب للسعر ضمن هذا التقاطع
+                k = keys[j] if abs(keys[j] - spot) < abs(keys[j - 1] - spot) else keys[j - 1]
+                crossings.append(k)
+        if crossings:
+            flip = min(crossings, key=lambda k: abs(k - spot))  # الأقرب للسعر
+        else:
             flip = near.abs().idxmin()
     else:
         flip = by_strike.abs().idxmin()
