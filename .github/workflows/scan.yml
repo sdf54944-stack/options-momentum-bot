@@ -1,10 +1,23 @@
 name: options-momentum-scan
+
 on:
   schedule:
     - cron: "7,37 12-22 * * 1-5"
   workflow_dispatch:
+    inputs:
+      force:
+        description: "اختبار فوري: اختر مرحلة"
+        default: "none"
+        type: choice
+        options:
+          - none
+          - premarket
+          - closing
+          - intraday
+
 permissions:
   contents: write
+
 jobs:
   scan:
     runs-on: ubuntu-latest
@@ -14,10 +27,12 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt
+
       - name: Run scanner
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          FORCE_PHASE: ${{ github.event.inputs.force }}
         run: python scanner.py
 
       - name: Alert on crash
@@ -29,3 +44,20 @@ jobs:
           curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage" \
             -d chat_id="${TELEGRAM_CHAT_ID}" \
             -d text="🔴 Scanner crashed at run $GITHUB_RUN_NUMBER. Check Actions logs."
+
+      - name: Commit state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if [ -f state/top10.json ]; then
+            git add state/top10.json
+            if git diff --staged --quiet; then
+              echo "no state change"
+            else
+              git commit -m "update state [skip ci]"
+              git pull --rebase --autostash origin main
+              git push
+            fi
+          else
+            echo "no state file - skipping"
+          fi
