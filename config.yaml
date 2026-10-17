@@ -1,4 +1,3 @@
-# ===== الرموز =====
 universe:
   - AAPL
   - TSLA
@@ -17,28 +16,31 @@ universe:
   - MARA
   - AVGO
 
-# ===== الفلاتر =====
 filters:
   top_n: 10
   min_volume: 100
   min_open_interest: 250
   max_expiries: 4
 
-# ===== الترتيب =====
-# ranking: "vol_oi" (زخم خالص) | "volume" | "composite"
 ranking: "vol_oi"
-composite_weights:      # يُستخدم فقط إذا ranking = composite
+composite_weights:
   vol_oi: 0.6
   volume: 0.4
 
-# ===== ساعات السوق (ET) =====
 market:
   open: "09:30"
   close: "16:00"
 
-# ===== التحصين =====
-health:
-  # يُنبّه إذا نسبة الرموز التي رجعت "لا بيانات" تجاوزت هذا (0.0–1.0)
-  no_data_alert_ratio: 0.5
-  # رسالة نبض يومية تؤكد أن البوت حيّ (ضمن أول تشغيل بعد هذا الوقت ET)
-  heartbeat_after: "09:35"
+features:
+  premarket_news: true
+  intraday_alerts: true     # التنبيهات اللحظية أثناء الجلسة — اجعلها false لإيقافها
+  closing_summary: true
+
+schedule:
+  premarket_news_time: "09:00"   # ET — قبل الافتتاح
+  closing_summary_time: "16:05"  # ET — بعد الإغلاق
+
+news:
+  lookback_hours: 18
+  max_per_ticker: 2
+  max_total: 25
