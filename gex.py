@@ -1,4 +1,4 @@
-import os, math, json
+import os, math
 import yfinance as yf
 import pandas as pd
 import numpy as np
@@ -11,10 +11,9 @@ TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
 TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 
 TICKER = os.environ.get("GEX_TICKER", "SPY")
-R = 0.045                 # سعر فائدة تقريبي
-N_EXPIRIES = 1            # أقرب استحقاق
-SPX_MULT = 10             # SPY→SPX (السعر والقيم)
-NEAR_PCT = 0.15           # نطاق البحث عن Flip حول السعر (±15%)
+R = 0.045
+N_EXPIRIES = 1
+SPX_MULT = 10
 RIYADH = ZoneInfo("Asia/Riyadh")
 
 
@@ -45,7 +44,7 @@ def get_spot(ticker):
         return None
 
 
-def compute_gex(ticker):
+def compute_walls(ticker):
     t = yf.Ticker(ticker)
     spot = get_spot(ticker)
     if spot is None:
@@ -81,7 +80,7 @@ def compute_gex(ticker):
                     continue
                 gamma = bs_gamma(spot, float(strike), T, float(iv))
                 gex = sign * gamma * oi * 100 * spot * spot * 0.01
-                rows.append({"strike": float(strike), "gex": gex, "sign": sign})
+                rows.append({"strike": float(strike), "gex": gex})
 
     if not rows:
         return None
@@ -91,64 +90,29 @@ def compute_gex(ticker):
     if by_strike.empty:
         return None
 
-    net = g["gex"].sum()
-    call_gex = g[g["sign"] > 0]["gex"].sum()
-    put_gex = g[g["sign"] < 0]["gex"].sum()
-    call_wall = by_strike.idxmax()
-    put_wall = by_strike.idxmin()
-
-    # Gamma Flip: التقاطع الأقرب للسعر بين كل تقاطعات GEX التراكمي
-    lo, hi = spot * (1 - NEAR_PCT), spot * (1 + NEAR_PCT)
-    near = by_strike[(by_strike.index >= lo) & (by_strike.index <= hi)]
-    flip = None
-    if not near.empty:
-        cum = near.cumsum()
-        keys = list(cum.index)
-        crossings = []
-        for j in range(1, len(keys)):
-            if (cum[keys[j - 1]] < 0) != (cum[keys[j]] < 0):
-                # النقطة الأقرب للسعر ضمن هذا التقاطع
-                k = keys[j] if abs(keys[j] - spot) < abs(keys[j - 1] - spot) else keys[j - 1]
-                crossings.append(k)
-        if crossings:
-            flip = min(crossings, key=lambda k: abs(k - spot))  # الأقرب للسعر
-        else:
-            flip = near.abs().idxmin()
-    else:
-        flip = by_strike.abs().idxmin()
-
     return {
-        "spot": spot, "expiry": used_expiry,
-        "net": net, "call_gex": call_gex, "put_gex": put_gex,
-        "call_wall": call_wall, "put_wall": put_wall, "flip": flip,
+        "spot": spot,
+        "expiry": used_expiry,
+        "call_wall": by_strike.idxmax(),   # أعلى GEX موجب = جدار المقاومة
+        "put_wall": by_strike.idxmin(),    # أدنى GEX = جدار الدعم
     }
 
 
-def b(x):
-    return f"${x * SPX_MULT / 1e9:,.2f}B"   # القيم بمقياس SPX
-
-
 def report(ticker):
-    d = compute_gex(ticker)
+    d = compute_walls(ticker)
     stamp = datetime.now(RIYADH).strftime("%d %b %Y · %I:%M %p KSA")
     if d is None:
-        send_telegram(f"📈 <b>GEX {ticker}</b>\nلا بيانات كافية.\n{stamp}")
+        send_telegram(f"📈 <b>GEX Walls {ticker}</b>\nلا بيانات كافية.\n{stamp}")
         return
     m = SPX_MULT if ticker == "SPY" else 1
     msg = (
-        f"📈 <b>Gamma Exposure (تقريبي)</b>\n"
+        f"📈 <b>Gamma Walls (تقريبي)</b>\n"
         f"🏷 Ticker: {ticker}  (≈SPX ×{m})\n"
         f"📅 Expiry: {d['expiry']}\n"
         f"💰 Spot: {d['spot']:.2f}  (≈SPX {d['spot'] * m:.0f})\n\n"
-        f"<b>السيولة:</b>\n"
-        f"🟢 Net GEX  {b(d['net'])}\n"
-        f"🟢 Call GEX {b(d['call_gex'])}\n"
-        f"🔴 Put GEX  {b(d['put_gex'])}\n\n"
         f"<b>الجدران:</b>\n"
         f"🟢 Call Wall {d['call_wall']:.0f}  (≈{d['call_wall'] * m:.0f})\n"
         f"🔴 Put Wall  {d['put_wall']:.0f}  (≈{d['put_wall'] * m:.0f})\n\n"
-        f"<b>الفاصل:</b>\n"
-        f"⚖️ Gamma Flip {d['flip']:.0f}  (≈{d['flip'] * m:.0f})\n\n"
         f"🕐 {stamp}\n"
         f"⚠️ تقريبي على SPY — ليس بديلاً عن مصدر دقيق."
     )
