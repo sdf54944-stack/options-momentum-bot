@@ -1,0 +1,26 @@
+name: gex-report
+
+on:
+  schedule:
+    - cron: "37 13 * * 1-5"    # ~افتتاح السوق (مرة صباحًا)
+    - cron: "7 20 * * 1-5"     # ~قبل الإغلاق
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gex:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install yfinance pandas numpy requests scipy
+      - name: Run GEX
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GEX_TICKER: "SPY"
+        run: python gex.py
