@@ -153,8 +153,14 @@ def fetch_news(ticker, since_dt):
     try:
         items = yf.Ticker(ticker).news or []
     except Exception as e:
-        print(f"news skip {ticker}: {e}")
+        print(f"news ERROR {ticker}: {e}")
         return []
+    # تشخيص: اطبع العدد وأول عنصر خام لأول رمز فيه بيانات
+    if items:
+        print(f"[DIAG] {ticker}: {len(items)} items | keys of item[0]: {list(items[0].keys())}")
+        print(f"[DIAG] {ticker}: raw item[0] = {json.dumps(items[0], default=str)[:800]}")
+    else:
+        print(f"[DIAG] {ticker}: 0 items returned")
     out = []
     for it in items:
         if not isinstance(it, dict):
@@ -179,6 +185,7 @@ def fetch_news(ticker, since_dt):
         if ts is not None and ts < since_dt:
             continue
         out.append({"title": title, "pub": pub, "link": link})
+    print(f"[DIAG] {ticker}: parsed {len(out)} after filter")
     return out
 
 def phase_premarket(state, force=False):
