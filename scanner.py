@@ -12,6 +12,7 @@ with open("config.yaml", encoding="utf-8") as f:
 
 TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
 TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
+FORCE = os.environ.get("FORCE_PHASE", "none").strip().lower()
 
 UNIVERSE = CFG["universe"]
 TOP_N = CFG["filters"]["top_n"]
@@ -88,7 +89,6 @@ def health_alert_once(state, kind, msg):
     send_telegram(msg)
     mark_fired(state, key)
 
-# ===== الأوبشن =====
 def fetch_contracts(ticker, side="calls", retries=2):
     for attempt in range(retries + 1):
         try:
@@ -149,7 +149,6 @@ def top_snapshot(side):
     note = f" | Exp {exps[0]}" if len(exps) == 1 else ""
     return top, note
 
-# ===== الأخبار =====
 def fetch_news(ticker, since_dt):
     try:
         items = yf.Ticker(ticker).news or []
@@ -182,10 +181,9 @@ def fetch_news(ticker, since_dt):
         out.append({"title": title, "pub": pub, "link": link})
     return out
 
-# ===== المراحل =====
-def phase_premarket(state):
-    t = now_et().time()
-    if not (PREMARKET_TIME <= t < dtime(12, 0)) or fired_today(state, "premarket_date"):
+def phase_premarket(state, force=False):
+    if not force and (not (PREMARKET_TIME <= now_et().time() < dtime(12, 0))
+                      or fired_today(state, "premarket_date")):
         return
     since = datetime.now(timezone.utc) - timedelta(hours=NEWS_LOOKBACK)
     blocks, total = [], 0
@@ -211,9 +209,10 @@ def phase_premarket(state):
     msg = head + ("\n\n" + "\n\n".join(blocks) if blocks
                   else "\n\nلا عناوين مهمة في آخر الساعات — البوت حيّ.")
     send_telegram(msg, preview=False)
-    mark_fired(state, "premarket_date")
+    if not force:
+        mark_fired(state, "premarket_date")
 
-def phase_intraday(state):
+def phase_intraday(state, force=False):
     ts = et_stamp()
     oks = []
     for side, label in [("calls", "CALL"), ("puts", "PUT")]:
@@ -225,12 +224,15 @@ def phase_intraday(state):
         oks.append(True)
         current = top["contractSymbol"].tolist()
         prev = set(state.get(side, []))
-        state[side] = current
+        if not force:
+            state[side] = current
         if not prev:
-            print(f"{side}: seeding"); continue
-        new_ids = [c for c in current if c not in prev]
+            print(f"{side}: seeding")
+            continue
+        new_ids = [c for c in current if c not in prev] if not force else current
         if not new_ids:
-            print(f"{side}: no new"); continue
+            print(f"{side}: no new")
+            continue
         table = build_table(top, new_ids)
         send_telegram(f"<b>{label} momentum - {ts}{note}</b>\n"
                       f"New in Top 10: {len(new_ids)}\n<pre>{table}</pre>")
@@ -239,8 +241,8 @@ def phase_intraday(state):
                           f"⚠️ fetch failed for all symbols at {ts}. "
                           f"Yahoo may be blocking cloud IPs — consider Tradier.")
 
-def phase_closing(state):
-    if now_et().time() < CLOSING_TIME or fired_today(state, "closing_date"):
+def phase_closing(state, force=False):
+    if not force and (now_et().time() < CLOSING_TIME or fired_today(state, "closing_date")):
         return
     date = now_et().strftime("%Y-%m-%d")
     for side, label in [("calls", "CALL"), ("puts", "PUT")]:
@@ -251,16 +253,28 @@ def phase_closing(state):
         table = build_table(top, [])
         send_telegram(f"<b>🔔 الملخص الختامي {label} — {date}{note}</b>\n"
                       f"إغلاق {saudi_of(16, 0)} بتوقيت الرياض\n<pre>{table}</pre>")
-    mark_fired(state, "closing_date")
+    if not force:
+        mark_fired(state, "closing_date")
 
 if __name__ == "__main__":
     state = load_state()
-    phases = [
+    forced = {
+        "premarket": lambda: phase_premarket(state, force=True),
+        "closing": lambda: phase_closing(state, force=True),
+        "intraday": lambda: phase_intraday(state, force=True),
+    }
+    if FORCE in forced:
+        print(f"FORCED TEST: {FORCE} (state not saved)")
+        try:
+            forced[FORCE]()
+        except Exception as e:
+            print(f"forced {FORCE} error: {e}")
+        raise SystemExit(0)
+    for name, fn in [
         ("premarket", lambda: phase_premarket(state) if FEAT["premarket_news"] else None),
-        ("intraday",  lambda: phase_intraday(state) if FEAT["intraday_alerts"] and market_is_open() else None),
-        ("closing",   lambda: phase_closing(state) if FEAT["closing_summary"] else None),
-    ]
-    for name, fn in phases:
+        ("intraday", lambda: phase_intraday(state) if FEAT["intraday_alerts"] and market_is_open() else None),
+        ("closing", lambda: phase_closing(state) if FEAT["closing_summary"] else None),
+    ]:
         try:
             fn()
         except Exception as e:
