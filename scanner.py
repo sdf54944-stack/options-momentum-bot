@@ -150,41 +150,30 @@ def top_snapshot(side):
     return top, note
 
 def fetch_news(ticker, since_dt):
+    import feedparser
+    url = f"https://feeds.finance.yahoo.com/rss/2.0/headline?s={ticker}&region=US&lang=en-US"
     try:
-        items = yf.Ticker(ticker).news or []
+        feed = feedparser.parse(url)
     except Exception as e:
-        print(f"news ERROR {ticker}: {e}")
+        print(f"[DIAG] {ticker}: RSS ERROR {e}")
         return []
-    # تشخيص: اطبع العدد وأول عنصر خام لأول رمز فيه بيانات
-    if items:
-        print(f"[DIAG] {ticker}: {len(items)} items | keys of item[0]: {list(items[0].keys())}")
-        print(f"[DIAG] {ticker}: raw item[0] = {json.dumps(items[0], default=str)[:800]}")
-    else:
-        print(f"[DIAG] {ticker}: 0 items returned")
+    entries = feed.entries or []
+    print(f"[DIAG] {ticker}: {len(entries)} RSS entries")
     out = []
-    for it in items:
-        if not isinstance(it, dict):
-            continue
-        c = it.get("content", it)
-        title = c.get("title") or it.get("title")
+    for e in entries:
+        title = getattr(e, "title", None)
         if not title:
             continue
         ts = None
-        raw = c.get("pubDate") or c.get("displayTime")
-        if raw:
+        if getattr(e, "published_parsed", None):
             try:
-                ts = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+                ts = datetime(*e.published_parsed[:6], tzinfo=timezone.utc)
             except Exception:
                 ts = None
-        elif it.get("providerPublishTime"):
-            ts = datetime.fromtimestamp(it["providerPublishTime"], tz=timezone.utc)
-        prov = c.get("provider")
-        pub = prov.get("displayName", "") if isinstance(prov, dict) else it.get("publisher", "")
-        cu = c.get("canonicalUrl") or c.get("clickThroughUrl")
-        link = cu.get("url", "") if isinstance(cu, dict) else it.get("link", "")
         if ts is not None and ts < since_dt:
             continue
-        out.append({"title": title, "pub": pub, "link": link})
+        link = getattr(e, "link", "")
+        out.append({"title": title, "pub": "Yahoo Finance", "link": link})
     print(f"[DIAG] {ticker}: parsed {len(out)} after filter")
     return out
 
