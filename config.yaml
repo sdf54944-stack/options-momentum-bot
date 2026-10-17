@@ -41,6 +41,6 @@ schedule:
   closing_summary_time: "16:05"  # ET — بعد الإغلاق
 
 news:
-  lookback_hours: 72
+  lookback_hours: 18
   max_per_ticker: 2
   max_total: 25
